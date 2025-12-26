@@ -1,0 +1,197 @@
+<meta name='viewport' content='width=device-width, initial-scale=1'/><!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>LOBOCHAT - P2P Directo</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap');
+        :root { --bg-dark: #020617; }
+        body { 
+            font-family: 'Plus Jakarta Sans', sans-serif; 
+            background-color: var(--bg-dark); 
+            color: #f8fafc; 
+            margin: 0; 
+            height: 100vh; 
+            display: flex; 
+            flex-direction: column; 
+            overflow: hidden; 
+        }
+        .wolf-gradient { background: radial-gradient(circle at top, #1e293b 0%, #020617 100%); }
+        .custom-scroll::-webkit-scrollbar { width: 4px; }
+        .custom-scroll::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
+        .animate-msg { animation: fadeIn 0.2s ease forwards; }
+        @keyframes fadeIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
+    </style>
+</head>
+<body class="flex flex-col">
+
+    <!-- LOGIN / CONEXIÓN P2P -->
+    <div id="login-screen" class="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950 p-6">
+        <div class="bg-slate-900 border border-slate-800 p-8 rounded-[2.5rem] shadow-2xl w-full max-w-md">
+            <div class="text-center mb-8">
+                <div class="w-16 h-16 bg-indigo-600 text-white rounded-2xl flex items-center justify-center mx-auto shadow-2xl mb-4">
+                    <svg viewBox="0 0 24 24" class="w-8 h-8" fill="currentColor"><path d="M12,2L9,7L4,8L7,12L5,17L10,15L12,22L14,15L19,17L17,12L20,8L15,7L12,2Z" /></svg>
+                </div>
+                <h1 class="text-3xl font-black text-white tracking-tighter">LOBOCHAT <span class="text-indigo-500">P2P</span></h1>
+                <p class="text-slate-500 text-[10px] uppercase font-black tracking-widest mt-2">Sin Servidores • Conexión Directa</p>
+            </div>
+            
+            <div id="setup-form" class="space-y-4">
+                <input type="text" id="username-input" placeholder="Tu Apodo" class="w-full bg-slate-800 border border-slate-700 rounded-2xl px-6 py-4 text-white font-bold outline-none focus:border-indigo-500">
+                
+                <div class="p-4 bg-slate-950/50 rounded-2xl border border-slate-800">
+                    <p class="text-[9px] text-slate-500 uppercase font-black mb-2">Tu ID para que te encuentren:</p>
+                    <div id="my-id-display" class="text-indigo-400 font-mono font-bold text-sm">Cargando ID...</div>
+                </div>
+
+                <div class="space-y-2">
+                    <p class="text-[9px] text-slate-500 uppercase font-black">Conectar con un amigo:</p>
+                    <input type="text" id="peer-id-input" placeholder="Pega el ID de tu amigo aquí" class="w-full bg-slate-800 border border-slate-700 rounded-2xl px-6 py-4 text-white font-bold outline-none focus:border-indigo-500 text-sm">
+                </div>
+
+                <button onclick="connectToPeer()" class="w-full bg-indigo-600 text-white font-black py-5 rounded-2xl hover:bg-indigo-500 transition-all uppercase tracking-widest text-xs">Unirse al Territorio</button>
+                <button onclick="startChatOnly()" class="w-full bg-slate-800 text-slate-400 font-black py-3 rounded-2xl hover:text-white transition-all text-[10px] uppercase">Esperar conexiones (Modo Host)</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- APP UI -->
+    <header class="h-20 p-4 flex justify-between items-center border-b border-slate-800 bg-slate-950/90 backdrop-blur-xl z-30">
+        <div class="flex items-center space-x-3">
+            <div class="w-10 h-10 rounded-xl bg-indigo-600 flex items-center justify-center font-black text-white" id="user-avatar">?</div>
+            <div>
+                <h2 id="display-name" class="font-bold text-white text-sm leading-none mb-1">...</h2>
+                <p id="conn-status" class="text-[9px] text-emerald-500 font-black uppercase tracking-widest leading-none">Esperando conexión...</p>
+            </div>
+        </div>
+        <button onclick="copyMyId()" class="p-3 bg-slate-900 text-slate-400 rounded-xl border border-slate-800 text-[10px] font-bold">
+            MI ID
+        </button>
+    </header>
+
+    <div class="flex-1 relative overflow-hidden flex flex-col wolf-gradient">
+        <main id="chat-container" class="flex-1 overflow-y-auto p-4 md:p-6 space-y-4 custom-scroll">
+            <div id="messages-list" class="space-y-4"></div>
+        </main>
+    </div>
+
+    <footer class="p-4 bg-slate-950 border-t border-slate-900">
+        <form id="message-form" class="flex items-center space-x-2 max-w-5xl mx-auto">
+            <input type="text" id="message-input" placeholder="Mensaje directo..." class="flex-1 bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white outline-none focus:ring-1 focus:ring-indigo-500">
+            <button type="submit" class="bg-indigo-600 text-white p-3 rounded-xl">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9-2-9-18-9 18 9 2zm0 0v-8" /></svg>
+            </button>
+        </form>
+    </footer>
+
+    <script>
+        let peer;
+        let connections = [];
+        let myName = "";
+        let myId = "";
+
+        // Inicializar PeerJS (Usa servidores públicos de PeerJS solo para el apretón de manos inicial)
+        function initPeer() {
+            peer = new Peer();
+
+            peer.on('open', (id) => {
+                myId = id;
+                document.getElementById('my-id-display').innerText = id;
+            });
+
+            // Al recibir una conexión
+            peer.on('connection', (conn) => {
+                setupConnection(conn);
+            });
+
+            peer.on('error', (err) => {
+                alert("Error de conexión: " + err.type);
+            });
+        }
+
+        function setupConnection(conn) {
+            conn.on('open', () => {
+                connections.push(conn);
+                document.getElementById('conn-status').innerText = "Conectado (" + connections.length + ")";
+                document.getElementById('login-screen').classList.add('hidden');
+            });
+
+            conn.on('data', (data) => {
+                if (data.type === 'chat') {
+                    renderMsg(data.name, data.text, false);
+                }
+            });
+
+            conn.on('close', () => {
+                connections = connections.filter(c => c !== conn);
+                document.getElementById('conn-status').innerText = connections.length > 0 ? "Conectado (" + connections.length + ")" : "Sin conexiones";
+            });
+        }
+
+        window.connectToPeer = () => {
+            const peerId = document.getElementById('peer-id-input').value.trim();
+            myName = document.getElementById('username-input').value.trim() || "Lobo";
+            if (!peerId) return alert("Ingresa el ID de tu amigo");
+
+            const conn = peer.connect(peerId);
+            setupConnection(conn);
+            startChatOnly();
+        };
+
+        window.startChatOnly = () => {
+            myName = document.getElementById('username-input').value.trim() || "Lobo";
+            document.getElementById('display-name').innerText = myName;
+            document.getElementById('user-avatar').innerText = myName[0].toUpperCase();
+            document.getElementById('login-screen').classList.add('hidden');
+        };
+
+        function renderMsg(name, text, isMe) {
+            const list = document.getElementById('messages-list');
+            const div = document.createElement('div');
+            div.className = `flex flex-col ${isMe ? 'items-end' : 'items-start'} animate-msg`;
+            div.innerHTML = `
+                <div class="max-w-[85%]">
+                    <div class="px-2 mb-1 text-[9px] font-bold text-slate-500 uppercase">${name}</div>
+                    <div class="p-3 rounded-2xl ${isMe ? 'bg-indigo-600 text-white' : 'bg-slate-800 text-slate-200'}">
+                        <p class="text-sm">${text}</p>
+                    </div>
+                </div>
+            `;
+            list.appendChild(div);
+            const chat = document.getElementById('chat-container');
+            chat.scrollTop = chat.scrollHeight;
+        }
+
+        document.getElementById('message-form').onsubmit = (e) => {
+            e.preventDefault();
+            const input = document.getElementById('message-input');
+            const text = input.value.trim();
+            if (!text) return;
+
+            renderMsg("Tú", text, true);
+            
+            connections.forEach(conn => {
+                conn.send({ type: 'chat', name: myName, text: text });
+            });
+
+            input.value = '';
+        };
+
+        window.copyMyId = () => {
+            const el = document.createElement('textarea');
+            el.value = myId;
+            document.body.appendChild(el);
+            el.select();
+            document.execCommand('copy');
+            document.body.removeChild(el);
+            alert("Tu ID ha sido copiado: " + myId);
+        };
+
+        initPeer();
+    </script>
+</body>
+</html>
+
